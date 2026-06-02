@@ -1,0 +1,144 @@
+/* =============================================================
+   Mango · Design Tokens
+   -------------------------------------------------------------
+   All colors, type, spacing and elevation live here as CSS
+   custom properties. Light is the default; [data-theme="dark"]
+   on <html> overrides the palette. Nothing else in the app
+   hard-codes a color.
+   ============================================================= */
+
+:root {
+  /* ---- Type families ---------------------------------------- */
+  --font-display: "Bricolage Grotesque", "Archivo", system-ui, sans-serif;
+  --font-body: "Archivo", system-ui, -apple-system, sans-serif;
+  --font-mono: "Space Mono", "SFMono-Regular", ui-monospace, monospace;
+
+  /* ---- Type scale (fluid-ish, rem based) -------------------- */
+  --fs-xs: 0.75rem;    /* 12px */
+  --fs-sm: 0.8125rem;  /* 13px */
+  --fs-base: 0.9375rem;/* 15px */
+  --fs-md: 1.0625rem;  /* 17px */
+  --fs-lg: 1.375rem;   /* 22px */
+  --fs-xl: 1.875rem;   /* 30px */
+  --fs-2xl: 2.5rem;    /* 40px */
+  --fs-3xl: 3.25rem;   /* 52px */
+
+  /* ---- Spacing scale (4px base) ----------------------------- */
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.5rem;
+  --sp-6: 2rem;
+  --sp-7: 2.5rem;
+  --sp-8: 3.5rem;
+
+  /* ---- Radius ------------------------------------------------ */
+  --r-sm: 8px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --r-pill: 999px;
+
+  /* ---- Motion ------------------------------------------------ */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur: 0.22s;
+
+  /* ---- Layout ------------------------------------------------ */
+  --shell-max: 1180px;
+  --nav-h: 68px;
+
+  /* =========================================================
+     LIGHT THEME (default)
+     ========================================================= */
+  --bg: #F4F1E9;
+  --bg-grain: #EFEBE0;
+  --surface: #FFFFFF;
+  --surface-2: #FBF9F3;
+  --surface-3: #F1EDE2;
+  --border: #E3DDCC;
+  --border-strong: #D2CAB3;
+
+  --text: #19211C;
+  --text-muted: #5B655D;
+  --text-faint: #8E978D;
+  --text-on-primary: #FFFFFF;
+  --text-on-accent: #FFFFFF;
+
+  --primary: #0E7C57;
+  --primary-strong: #0A5E42;
+  --primary-soft: #DBEEE4;
+  --primary-ring: rgba(14, 124, 87, 0.28);
+
+  --accent: #E4572E;
+  --accent-strong: #C2431F;
+  --accent-soft: #FAE2D9;
+
+  --warning: #C98209;
+  --warning-soft: #F8E9CA;
+  --danger: #C23922;
+  --danger-soft: #F7DDD6;
+  --positive: #0E7C57;
+
+  --shadow-sm: 0 1px 2px rgba(25, 33, 28, 0.06), 0 1px 1px rgba(25, 33, 28, 0.04);
+  --shadow-md: 0 6px 18px -6px rgba(25, 33, 28, 0.16), 0 2px 6px rgba(25, 33, 28, 0.06);
+  --shadow-lg: 0 24px 50px -18px rgba(25, 33, 28, 0.32), 0 8px 20px -10px rgba(25, 33, 28, 0.18);
+
+  /* Category palette — shared by charts & badges, tuned for both themes */
+  --cat-comida: #E4572E;
+  --cat-transporte: #2D86C4;
+  --cat-servicios: #D99A1F;
+  --cat-entretenimiento: #8E5BD9;
+  --cat-salud: #13A89A;
+  --cat-compras: #DB4F7E;
+  --cat-educacion: #4F6FD0;
+  --cat-otros: #8A938C;
+
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --bg: #0C100E;
+  --bg-grain: #0F1411;
+  --surface: #161C18;
+  --surface-2: #1B221D;
+  --surface-3: #222A24;
+  --border: #2A332C;
+  --border-strong: #3A463C;
+
+  --text: #ECE9DD;
+  --text-muted: #9DA69C;
+  --text-faint: #6B746B;
+  --text-on-primary: #07120D;
+  --text-on-accent: #FFFFFF;
+
+  --primary: #34D399;
+  --primary-strong: #25B47C;
+  --primary-soft: rgba(52, 211, 153, 0.15);
+  --primary-ring: rgba(52, 211, 153, 0.3);
+
+  --accent: #FF7A57;
+  --accent-strong: #FF6038;
+  --accent-soft: rgba(255, 122, 87, 0.16);
+
+  --warning: #E7A93B;
+  --warning-soft: rgba(231, 169, 59, 0.16);
+  --danger: #F2715A;
+  --danger-soft: rgba(242, 113, 90, 0.16);
+  --positive: #34D399;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 22px -8px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 30px 60px -20px rgba(0, 0, 0, 0.7), 0 10px 24px -12px rgba(0, 0, 0, 0.55);
+
+  --cat-comida: #FF7A57;
+  --cat-transporte: #4FA8E8;
+  --cat-servicios: #ECB94A;
+  --cat-entretenimiento: #A87DEC;
+  --cat-salud: #2BC6B6;
+  --cat-compras: #F06C97;
+  --cat-educacion: #7B96E8;
+  --cat-otros: #9DA69C;
+
+  color-scheme: dark;
+}

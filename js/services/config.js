@@ -12,10 +12,10 @@ App.config = {
   /* When true, api.js resolves every request against in-memory
      mock data (see mockData.js). When false, it performs real
      fetch() calls to API_BASE_URL. */
-  USE_MOCK: true,
+  USE_MOCK: false,
 
   /* Base URL of the real REST API (used only when USE_MOCK = false). */
-  API_BASE_URL: "https://api.mango.example/v1",
+  API_BASE_URL: "http://localhost:3000",
 
   /* localStorage keys */
   TOKEN_KEY: "mango.token",

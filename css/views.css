@@ -152,8 +152,51 @@ canvas { max-width: 100%; }
 
 .reco-item { padding: var(--sp-4); border-radius: var(--r-md); border: 1px solid var(--border); background: var(--surface-2); margin-bottom: var(--sp-3); }
 .reco-item .r-top { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+.reco-item .r-top svg { width: 16px; height: 16px; flex-shrink: 0; }
+.reco-item svg { width: 16px; height: 16px; flex-shrink: 0; }
 .reco-item .r-date { font-size: var(--fs-xs); color: var(--text-faint); margin-left: auto; }
 .reco-item p { font-size: var(--fs-sm); }
+.answer-form textarea { width: 100%; box-sizing: border-box; }
+
+/* SVG size fixes — empty/error states */
+.empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sp-3); padding: var(--sp-8) var(--sp-4); text-align: center; color: var(--text-muted); }
+.empty .empty-mark { width: 48px; height: 48px; display: grid; place-items: center; }
+.empty .empty-mark svg { width: 48px; height: 48px; }
+.empty p { font-size: var(--fs-sm); max-width: 30ch; }
+
+/* answer form SVG fix */
+.answer-form svg { width: 16px; height: 16px; flex-shrink: 0; }
+.answer-form { margin-top: var(--sp-3); }
+
+/* ---- Profile badge (advisor view) ------------------------- */
+.profile-badge {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  padding: 0.3rem 0.75rem; border-radius: var(--r-pill);
+  font-size: var(--fs-xs); font-weight: 700; line-height: 1;
+}
+.profile-badge.conservador { background: color-mix(in srgb, var(--positive) 14%, transparent); color: var(--positive); }
+.profile-badge.moderado    { background: var(--primary-soft); color: var(--primary-strong); }
+.profile-badge.arriesgado  { background: var(--warning-soft); color: var(--warning); }
+.profile-badge.critico     { background: var(--danger-soft);  color: var(--danger); }
+[data-theme="dark"] .profile-badge.moderado { color: var(--primary); }
+
+/* ---- Consultas view --------------------------------------- */
+.consultas-layout { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-5); align-items: start; }
+@media (max-width: 800px) { .consultas-layout { grid-template-columns: 1fr; } }
+
+.consulta-item {
+  padding: var(--sp-4); border-radius: var(--r-md);
+  border: 1px solid var(--border); background: var(--surface-2);
+  margin-bottom: var(--sp-3);
+}
+.consulta-item .ci-top { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); flex-wrap: wrap; }
+.consulta-item .ci-top svg { width: 15px; height: 15px; flex-shrink: 0; }
+.consulta-item .ci-date { font-size: var(--fs-xs); color: var(--text-faint); margin-left: auto; }
+.consulta-item .ci-q { font-size: var(--fs-sm); font-weight: 600; margin-bottom: var(--sp-2); }
+.consulta-item .ci-ans { font-size: var(--fs-sm); color: var(--text-muted); border-left: 3px solid var(--primary); padding-left: var(--sp-3); margin-top: var(--sp-2); }
+.consulta-item .ci-pending { font-size: var(--fs-xs); color: var(--warning); font-weight: 700; }
+.consulta-status-open   { background: var(--warning-soft); color: var(--warning); }
+.consulta-status-closed { background: color-mix(in srgb, var(--positive) 14%, transparent); color: var(--positive); }
 
 .placeholder-pick {
   display: grid; place-items: center; min-height: 360px; text-align: center; color: var(--text-muted);

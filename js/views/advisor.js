@@ -39,6 +39,7 @@ App.views.asesor = async function (container, params) {
     await Promise.all(clients.map(async (c) => {
       c._expenses = await App.api.getExpenses(c.id);
       c._total = c._expenses.reduce((a, e) => a + e.amount, 0);
+      c._profile = App.analytics.classifyProfile(c._expenses);
     }));
   } catch (err) {
     listEl.innerHTML = '<div class="empty"><p>No se pudieron cargar los clientes.</p></div>';
@@ -59,6 +60,7 @@ App.views.asesor = async function (container, params) {
         '<span class="avatar">' + esc(F.initials(c.name)) + "</span>" +
         '<span class="who"><strong>' + esc(c.name) + "</strong><span>" + esc(c.city || c.email) + "</span></span>" +
         '<span class="ci-amount">' + F.money(c._total) + "</span>" +
+        (c._profile.problematic ? '<span class="badge" style="background:var(--danger-soft);color:var(--danger)">⚠ Atención</span>' : '') +
       "</button>").join("");
     $$(".client-item", listEl).forEach((b) => b.addEventListener("click", () => {
       selectedId = b.dataset.id;
@@ -86,6 +88,7 @@ App.views.asesor = async function (container, params) {
     const expenses = client._expenses || [];
     const recos = await App.api.getRecommendations(id).catch(() => []);
     const a = App.analytics.compute(expenses);
+    const profile = App.analytics.classifyProfile(expenses);
 
     detailEl.innerHTML =
       // client header
@@ -104,7 +107,15 @@ App.views.asesor = async function (container, params) {
             (a.totalPrevMonth ? (a.deltaPct >= 0 ? "▲ " : "▼ ") + Math.abs(a.deltaPct) + "% vs. mes anterior" : "—")) +
           insight("Categoría dominante", a.dominant ? a.dominant.label : "—",
             a.dominant ? a.dominant.pct + "% del total · " + F.money(a.dominant.total) : "") +
+          insight('Perfil financiero', profile.label, profile.description) +
         "</div>" +
+        (profile.problematic
+          ? '<div class="anomaly mt-4" style="background:var(--danger-soft);border:1px solid var(--danger-border);border-radius:var(--radius-sm);padding:var(--sp-3);">' +
+              '<span class="a-ico" style="color:var(--danger)">' + icon('alert') + '</span>' +
+              '<div><strong>Comportamiento de gasto problemático detectado</strong>' +
+              '<div class="faint" style="font-size:var(--fs-xs)">' + esc(profile.description) + '</div></div>' +
+            '</div>'
+          : '') +
 
         // anomalies
         '<div class="mt-6"><div class="section-title">Gastos inusuales detectados</div>' +
@@ -129,10 +140,18 @@ App.views.asesor = async function (container, params) {
             '<div class="row" style="justify-content:flex-end"><button class="btn btn-primary" type="submit" id="reco-send">' + icon("sparkle") + "Enviar recomendación</button></div>" +
           "</form>" +
           '<div class="mt-6" id="recoList"></div>' +
-        "</div></div>";
+        "</div></div>" +
+
+      // consultations
+      '<div class="card mt-4"><div class="card-head"><h3>' + icon('sparkle') + 'Consultas del cliente</h3>' +
+        '<span class="badge" id="consultBadge">…</span></div>' +
+        '<div class="card-body" id="consultPanel">' +
+          loaderBlock('Cargando consultas…') +
+        '</div></div>';
 
     renderRecos(recos);
     bindRecoForm(id);
+    await loadClientConsultations(id);
   }
 
   function renderRecos(recos) {
@@ -172,6 +191,88 @@ App.views.asesor = async function (container, params) {
         App.toast.error(err.message || "No se pudo enviar.", "Error");
       }
     });
+  }
+
+  async function loadClientConsultations(clientId) {
+    const panel = $('#consultPanel', detailEl);
+    const badge = $('#consultBadge', detailEl);
+    if (!panel) return;
+    try {
+      // El asesor obtiene TODAS las consultas y filtra por clientId
+      const all = await App.api.getAllConsultations();
+      const mine = all.filter((c) => c.userId === clientId || (c.user && c.user.id === clientId));
+      if (badge) badge.textContent = mine.length;
+      if (!mine.length) {
+        panel.innerHTML = '<p class="muted center" style="font-size:var(--fs-sm)">Este cliente no tiene consultas aún.</p>';
+        return;
+      }
+      renderConsultations(mine, panel);
+    } catch (err) {
+      if (panel) panel.innerHTML = '<p class="muted">No se pudieron cargar las consultas.</p>';
+    }
+  }
+
+  function renderConsultations(list, panel) {
+    const pending = list.filter((c) => !c.answer);
+    const answered = list.filter((c) => c.answer);
+
+    panel.innerHTML =
+      (pending.length ? '<div class="section-title">Pendientes (' + pending.length + ')</div>' : '') +
+      pending.map((c) => consultCard(c, true)).join('') +
+      (answered.length ? '<div class="section-title mt-4">Respondidas (' + answered.length + ')</div>' : '') +
+      answered.map((c) => consultCard(c, false)).join('');
+
+    // Bind submit buttons for pending consultations
+    panel.querySelectorAll('.answer-form').forEach((form) => {
+      form.addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        const id = form.dataset.id;
+        const textarea = form.querySelector('textarea');
+        const answer = textarea.value.trim();
+        if (!answer || answer.length < 10) {
+          App.toast.warning('La respuesta debe tener al menos 10 caracteres.');
+          return;
+        }
+        const btn = form.querySelector('button[type="submit"]');
+        App.ui.setLoading(btn, true, 'Respondiendo');
+        try {
+          await App.api.answerConsultation(id, answer);
+          App.toast.success('Respuesta enviada al cliente.');
+          await loadClientConsultations(id.split('-')[0]); // reload
+          // Reload complete to get fresh data
+          const all = await App.api.getAllConsultations();
+          const clientId = list[0] && (list[0].userId || (list[0].user && list[0].user.id));
+          const fresh = all.filter((c) => c.userId === clientId || (c.user && c.user.id === clientId));
+          renderConsultations(fresh, panel);
+          const badge = $('#consultBadge', detailEl);
+          if (badge) badge.textContent = fresh.length;
+        } catch (err) {
+          App.toast.error(err.message || 'No se pudo enviar la respuesta.', 'Error');
+        } finally {
+          App.ui.setLoading(btn, false);
+        }
+      });
+    });
+  }
+
+  function consultCard(c, showForm) {
+    return '<div class="reco-item">' +
+      '<div class="r-top">' + icon(showForm ? 'alert' : 'check') +
+        '<strong>' + esc(c.question) + '</strong>' +
+        '<span class="r-date">' + F.date(c.createdAt.slice(0, 10)) + '</span>' +
+      '</div>' +
+      (showForm
+        ? '<form class="answer-form mt-2" data-id="' + c.id + '" novalidate>' +
+            '<textarea class="input" rows="3" placeholder="Escribí tu respuesta…" style="margin-bottom:var(--sp-2)"></textarea>' +
+            '<div class="row" style="justify-content:flex-end">' +
+              '<button class="btn btn-primary btn-sm" type="submit">' + icon('sparkle') + 'Responder</button>' +
+            '</div>' +
+          '</form>'
+        : '<div class="mt-2" style="padding:var(--sp-3);background:var(--surface-2);border-radius:var(--radius-sm)">' +
+            '<div class="eyebrow mb-1">Tu respuesta · ' + F.date(c.answeredAt.slice(0, 10)) + '</div>' +
+            '<p>' + esc(c.answer) + '</p>' +
+          '</div>') +
+    '</div>';
   }
 
   function insight(label, value, note) {

@@ -86,5 +86,46 @@ App.analytics = (function () {
     };
   }
 
-  return { compute, lastMonths };
+  /**
+   * Clasifica el perfil financiero de un usuario según sus gastos.
+   * Retorna { label, description, badge } donde badge es una clase CSS.
+   */
+  function classifyProfile(expenses) {
+    if (!expenses.length) return { label: 'Sin datos', description: 'No hay suficientes gastos para clasificar.', badge: 'neutral' };
+
+    const a = compute(expenses);
+    const now = new Date(2026, 4, 28);
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1).toISOString().slice(0, 7);
+    const recent = expenses.filter((e) => e.date.slice(0, 7) >= sixMonthsAgo);
+    const anomalyRate = recent.length ? a.anomalies.length / recent.length : 0;
+    const monthlyGrowth = a.totalPrevMonth > 0 ? (a.totalThisMonth - a.totalPrevMonth) / a.totalPrevMonth : 0;
+
+    // Comportamiento problemático: muchas anomalías o crecimiento acelerado
+    if (anomalyRate > 0.15 || monthlyGrowth > 0.4) {
+      return {
+        label: 'Consumidor impulsivo',
+        description: 'Presenta gastos inusuales frecuentes o un aumento acelerado del gasto mensual. Se recomienda revisar sus hábitos.',
+        badge: 'danger',
+        problematic: true,
+      };
+    }
+    // Ahorrador: gasto promedio bajo y sin anomalías
+    if (a.avgMonthly < 30000 && anomalyRate === 0) {
+      return {
+        label: 'Consumidor ahorrador',
+        description: 'Gasto mensual bajo y controlado. Sin comportamientos fuera de lo habitual.',
+        badge: 'success',
+        problematic: false,
+      };
+    }
+    // Equilibrado
+    return {
+      label: 'Consumidor equilibrado',
+      description: 'Gasto mensual moderado sin comportamientos alarmantes.',
+      badge: 'info',
+      problematic: false,
+    };
+  }
+
+  return { compute, lastMonths, classifyProfile };
 })();

@@ -159,6 +159,36 @@ App.api = (function () {
       }
     }
 
+    /* ---- CONSULTATIONS ---- */
+    if (seg[0] === 'consultations') {
+      if (!db.consultations) { db.consultations = []; saveDb(); }
+
+      if (method === 'POST' && seg.length === 1) {
+        if (session.role !== 'user') throw new ApiError('No autorizado.', 403);
+        const c = { id: uid(), userId: session.sub, question: body.question,
+          answer: null, answeredAt: null, createdAt: new Date().toISOString() };
+        db.consultations.unshift(c); saveDb(); return c;
+      }
+      if (method === 'GET' && seg[1] === 'mine') {
+        if (session.role !== 'user') throw new ApiError('No autorizado.', 403);
+        return db.consultations.filter((c) => c.userId === session.sub);
+      }
+      if (method === 'GET' && seg.length === 1) {
+        if (session.role !== 'advisor') throw new ApiError('No autorizado.', 403);
+        return db.consultations.map((c) => {
+          const u = App.mock.users.find((x) => x.id === c.userId);
+          return { ...c, user: u ? { id: u.id, name: u.name, email: u.email } : null };
+        });
+      }
+      if (method === 'PATCH' && seg[2] === 'answer') {
+        if (session.role !== 'advisor') throw new ApiError('No autorizado.', 403);
+        const c = db.consultations.find((x) => x.id === seg[1]);
+        if (!c) throw new ApiError('Consulta no encontrada.', 404);
+        Object.assign(c, { answer: body.answer, answeredAt: new Date().toISOString() });
+        saveDb(); return c;
+      }
+    }
+
     /* ---- PROFILE ---- */
     if (path === "/me" && method === "PUT") {
       const u = App.mock.users.find((x) => x.id === session.sub);
@@ -216,6 +246,11 @@ App.api = (function () {
     listUsers: () => request("GET", "/users"),
     getRecommendations: (userId) => request("GET", "/recommendations?userId=" + userId),
     addRecommendation: (payload) => request("POST", "/recommendations", payload),
+    // consultations
+    getMyConsultations: () => request('GET', '/consultations/mine'),
+    createConsultation: (question) => request('POST', '/consultations', { question }),
+    getAllConsultations: () => request('GET', '/consultations'),
+    answerConsultation: (id, answer) => request('PATCH', '/consultations/' + id + '/answer', { answer }),
     // profile
     updateProfile: (payload) => request("PUT", "/me", payload),
   };

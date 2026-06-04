@@ -5,6 +5,9 @@
    "advisor". Includes theme toggle + user menu (profile,
    logout). Re-rendered by the router on every navigation so
    the active link stays in sync with the hash.
+
+   Advisor extra: notification bell that shows the count of
+   open (unanswered) consultations and a popup list.
    ============================================================= */
 
 window.App = window.App || {};
@@ -19,6 +22,7 @@ App.navbar = (function () {
       { href: "#/gastos",    label: "Gastos",    icon: "list" },
       { href: "#/nuevo",     label: "Cargar",    icon: "plus" },
       { href: "#/ticket",    label: "Ticket",    icon: "camera" },
+      { href: "#/consultas", label: "Consultas", icon: "sparkle" },
     ],
     advisor: [
       { href: "#/asesor",    label: "Clientes",  icon: "users" },
@@ -47,6 +51,14 @@ App.navbar = (function () {
         '<button class="icon-btn nav-burger" id="navBurger" aria-label="Menú">' + icon("menu") + "</button>" +
         '<div class="nav-links" id="navLinks">' + linkHtml + "</div>" +
         '<div class="nav-right">' +
+          (user.role === "advisor"
+            ? '<div class="user-menu" style="position:relative">' +
+                '<button class="notif-btn" id="notifBtn" aria-label="Consultas pendientes">' +
+                  icon("bell") +
+                  '<span class="notif-badge" id="notifBadge"></span>' +
+                "</button>" +
+              "</div>"
+            : "") +
           '<button class="theme-toggle" id="themeToggle" aria-label="Cambiar tema">' + icon(isDark ? "sun" : "moon") + "</button>" +
           '<div class="user-menu">' +
             '<button class="user-menu-btn" id="userMenuBtn" aria-haspopup="true" aria-expanded="false">' +
@@ -72,6 +84,82 @@ App.navbar = (function () {
 
     const menuBtn = $("#userMenuBtn", rootEl);
     if (menuBtn) menuBtn.addEventListener("click", (e) => { e.stopPropagation(); openUserMenu(menuBtn); });
+
+    const notifBtn = $("#notifBtn", rootEl);
+    if (notifBtn) {
+      // Cargar el conteo de consultas pendientes al montar el navbar
+      loadNotifCount(notifBtn);
+      notifBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openNotifPop(notifBtn);
+      });
+    }
+  }
+
+  async function loadNotifCount(btn) {
+    if (!btn) return;
+    const badge = btn.querySelector("#notifBadge") || btn.querySelector(".notif-badge");
+    try {
+      const all = await App.api.getAllConsultations();
+      const pending = all.filter((c) => !c.answer).length;
+      if (badge) {
+        badge.textContent = pending > 9 ? "9+" : String(pending);
+        badge.classList.toggle("visible", pending > 0);
+      }
+    } catch (e) {
+      // Si falla silenciosamente (p.ej. en modo mock sin consultas), no mostrar badge
+    }
+  }
+
+  function openNotifPop(btn) {
+    const F = App.format;
+    // Cerrar si ya está abierto
+    const existing = document.querySelector(".notif-pop");
+    if (existing) { existing.remove(); return; }
+
+    const pop = document.createElement("div");
+    pop.className = "notif-pop";
+    pop.innerHTML =
+      '<div class="notif-pop-head"><span>Consultas pendientes</span>' +
+        '<a href="#/asesor">Ver clientes</a>' +
+      "</div>" +
+      '<div class="notif-list" id="notifList"><div class="notif-empty">Cargando…</div></div>';
+
+    btn.parentElement.appendChild(pop);
+
+    const close = () => { pop.remove(); document.removeEventListener("click", close); };
+    setTimeout(() => document.addEventListener("click", close), 0);
+    pop.addEventListener("click", (e) => e.stopPropagation());
+
+    // Cargar consultas
+    App.api.getAllConsultations().then((all) => {
+      const pending = all.filter((c) => !c.answer);
+      const list = pop.querySelector("#notifList");
+      if (!list) return;
+      if (!pending.length) {
+        list.innerHTML = '<div class="notif-empty">No hay consultas pendientes 🎉</div>';
+        return;
+      }
+      list.innerHTML = pending.slice(0, 8).map((c) => {
+        const name = c.user ? esc(c.user.name) : "Cliente";
+        const q = esc(c.question.length > 60 ? c.question.slice(0, 60) + "…" : c.question);
+        const date = F.date(c.createdAt.slice(0, 10));
+        return '<div class="notif-item">' +
+          '<div class="ni-ico">' + icon("sparkle") + "</div>" +
+          '<div class="ni-body">' +
+            '<div class="ni-name">' + name + "</div>" +
+            '<div class="ni-q">' + q + "</div>" +
+            '<div class="ni-date">' + date + "</div>" +
+          "</div>" +
+        "</div>";
+      }).join("");
+      if (pending.length > 8) {
+        list.innerHTML += '<div class="notif-empty" style="padding:var(--sp-3)">+' + (pending.length - 8) + " consultas más</div>";
+      }
+    }).catch(() => {
+      const list = pop.querySelector("#notifList");
+      if (list) list.innerHTML = '<div class="notif-empty">No se pudieron cargar.</div>';
+    });
   }
 
   function openUserMenu(btn) {
@@ -80,7 +168,7 @@ App.navbar = (function () {
     const user = App.store.currentUser();
     const pop = document.createElement("div");
     pop.className = "menu-pop";
-    const profile = user.role === "user"
+    const profile = (user.role === "user" || user.role === "advisor")
       ? '<a href="#/perfil">' + icon("user") + "Mi perfil</a>"
       : "";
     pop.innerHTML =
@@ -95,5 +183,5 @@ App.navbar = (function () {
     pop.querySelector("#logoutBtn").addEventListener("click", () => { close(); App.actions.logout(); });
   }
 
-  return { render, bind };
+  return { render, bind, loadNotifCount };
 })();

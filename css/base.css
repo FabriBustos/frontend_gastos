@@ -158,6 +158,7 @@ img { max-width: 100%; display: block; }
   background: var(--surface-3); display: grid; place-items: center;
   margin: 0 auto var(--sp-4); font-size: 1.6rem;
 }
+.empty .empty-mark svg { width: 28px; height: 28px; }
 
 @media (max-width: 720px) {
   :root { --fs-2xl: 2rem; --fs-xl: 1.55rem; }

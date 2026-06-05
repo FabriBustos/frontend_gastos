@@ -14,8 +14,8 @@ App.config = {
      fetch() calls to API_BASE_URL. */
   USE_MOCK: false,
 
-  /* Base URL of the real REST API (used only when USE_MOCK = false). */
-API_BASE_URL: "https://backendgastos-production.up.railway.app",
+  /* Base URL of the real REST API (usado en develop: localhost, en main: Railway) */
+  API_BASE_URL: "http://localhost:3000",
 
   /* localStorage keys */
   TOKEN_KEY: "mango.token",

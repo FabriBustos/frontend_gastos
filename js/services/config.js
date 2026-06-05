@@ -15,7 +15,7 @@ App.config = {
   USE_MOCK: false,
 
   /* Base URL of the real REST API (used only when USE_MOCK = false). */
-  API_BASE_URL: "http://localhost:3000",
+API_BASE_URL: "https://backendgastos-production.up.railway.app",
 
   /* localStorage keys */
   TOKEN_KEY: "mango.token",

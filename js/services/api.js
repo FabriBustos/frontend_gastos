@@ -63,15 +63,26 @@ App.api = (function () {
      REAL transport — used when USE_MOCK = false
      ========================================================= */
   async function realRequest(method, path, body) {
-    const headers = { "Content-Type": "application/json" };
+    const headers = {};
     const token = getToken();
     if (token) headers["Authorization"] = "Bearer " + token;
+    
+    let fetchBody = undefined;
+    if (body) {
+      if (body instanceof FormData) {
+        fetchBody = body;
+      } else {
+        headers["Content-Type"] = "application/json";
+        fetchBody = JSON.stringify(body);
+      }
+    }
+
     let res;
     try {
       res = await fetch(cfg.API_BASE_URL + path, {
         method,
         headers,
-        body: body ? JSON.stringify(body) : undefined,
+        body: fetchBody,
       });
     } catch (e) {
       throw new ApiError("No se pudo conectar con el servidor.", 0);
@@ -240,8 +251,15 @@ App.api = (function () {
     createExpense: (payload) => request("POST", "/expenses", payload),
     updateExpense: (id, payload) => request("PUT", "/expenses/" + id, payload),
     deleteExpense: (id) => request("DELETE", "/expenses/" + id),
-    // tickets
-    uploadTicket: (file) => request("POST", "/tickets/upload", { filename: file && file.name }),
+    uploadTicket: (file) => {
+      if (cfg.USE_MOCK) {
+        return request("POST", "/tickets/upload", { filename: file && file.name });
+      } else {
+        const formData = new FormData();
+        formData.append("file", file);
+        return request("POST", "/tickets/upload", formData);
+      }
+    },
     // advisor
     listUsers: () => request("GET", "/users"),
     getRecommendations: (userId) => request("GET", "/recommendations?userId=" + userId),

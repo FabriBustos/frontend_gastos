@@ -50,6 +50,15 @@ App.analytics = (function () {
     const activeMonths = months.filter((m) => byMonth[m] > 0);
     const avgMonthly = activeMonths.length ? Math.round(months.reduce((a, m) => a + byMonth[m], 0) / Math.max(activeMonths.length, 1)) : 0;
 
+    // Promedio semanal: total de los últimos 6 meses dividido por las semanas transcurridas
+    const _now = new Date();
+    const sixMonthsAgo = new Date(_now.getFullYear(), _now.getMonth() - 6, 1);
+    const recentExpenses = expenses.filter((e) => new Date(e.date) >= sixMonthsAgo);
+    const weeksCovered = Math.max(1, Math.round((_now - sixMonthsAgo) / (7 * 24 * 60 * 60 * 1000)));
+    const avgWeekly = recentExpenses.length
+      ? Math.round(recentExpenses.reduce((s, e) => s + e.amount, 0) / weeksCovered)
+      : 0;
+
     const deltaPct = totalPrevMonth ? Math.round(((totalThisMonth - totalPrevMonth) / totalPrevMonth) * 100) : 0;
 
     const catList = Object.entries(byCat)
@@ -79,7 +88,7 @@ App.analytics = (function () {
 
     return {
       months, curKey, prevKey,
-      totalThisMonth, totalPrevMonth, avgMonthly, deltaPct,
+      totalThisMonth, totalPrevMonth, avgMonthly, avgWeekly, deltaPct,
       byMonth, catList, merchantRanking, maxMerchantCount,
       anomalies, dominant, totalAll, count: expenses.length,
       monthValues: months.map((m) => byMonth[m]),

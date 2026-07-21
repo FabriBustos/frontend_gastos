@@ -23,6 +23,8 @@ App.navbar = (function () {
       { href: "#/nuevo",     label: "Cargar",    icon: "plus" },
       { href: "#/ticket",    label: "Ticket",    icon: "camera" },
       { href: "#/consultas", label: "Consultas", icon: "sparkle" },
+      { href: "#/presupuestos", label: "Presupuestos", icon: "wallet" },
+      { href: "#/metas", label: "Metas", icon: "target" },
     ],
     advisor: [
       { href: "#/asesor",    label: "Clientes",  icon: "users" },

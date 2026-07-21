@@ -15,7 +15,7 @@ App.views.gastos = async function (container) {
 
   // view state
   let all = [];
-  const filters = { q: "", cat: "all", from: "", to: "" };
+  const filters = { q: "", cat: "all", from: "", to: "", minAmount: "", maxAmount: "" };
   let sort = { key: "date", dir: "desc" };
 
   container.innerHTML =
@@ -34,7 +34,10 @@ App.views.gastos = async function (container) {
           "</div></div>" +
         '<div class="field"><label>Desde</label><input class="input" type="date" id="fx-from" max="2026-05-28"></div>' +
         '<div class="field"><label>Hasta</label><input class="input" type="date" id="fx-to" max="2026-05-28"></div>' +
+        '<div class="field"><label>Monto mín.</label><input class="input" type="number" id="fx-min" min="0" placeholder="0"></div>' +
+        '<div class="field"><label>Monto máx.</label><input class="input" type="number" id="fx-max" min="0" placeholder="Sin límite"></div>' +
         '<button class="btn btn-soft" id="fx-clear" title="Limpiar filtros">' + icon("x") + "Limpiar</button>" +
+        '<button class="btn btn-soft" id="fx-export" title="Exportar CSV">' + icon("download") + "Exportar CSV</button>" +
       "</div>" +
       '<div class="filter-chips" id="catChips"></div>' +
       '<div class="results-meta" id="resultsMeta"></div>' +
@@ -45,7 +48,8 @@ App.views.gastos = async function (container) {
   const chipsHost = $("#catChips", container);
   chipsHost.innerHTML =
     chip("all", "Todas") +
-    App.mock.categories.map((c) => chip(c.key, c.label, c.key)).join("");
+    App.mock.categories.map((c) => chip(c.key, c.label, c.key)).join("") +
+    '<button class="chip" id="chipAnomal" data-cat="__anomal__">' + icon("alert") + " Inusuales</button>";
   function chip(key, label, catKey) {
     const sw = catKey ? '<span class="dot" style="background:var(--cat-' + catKey + ')"></span>' : "";
     return '<button class="chip" data-cat="' + key + '">' + sw + esc(label) + "</button>";
@@ -63,17 +67,32 @@ App.views.gastos = async function (container) {
     App.toast.error(err.message || "Error al cargar.", "Error");
     return;
   }
+  // Calcular set de IDs anómalos para marcarlos en la tabla
+  const anomalyIds = new Set(
+    App.analytics.compute(all).anomalies.map((e) => e.id)
+  );
   syncChips();
   renderTable();
 
   // ---- filtering ----
   function applyFilters() {
     return all.filter((e) => {
-      if (filters.cat !== "all" && e.category !== filters.cat) return false;
-      if (filters.q && !e.merchant.toLowerCase().includes(filters.q.toLowerCase()) &&
-          !(e.description || "").toLowerCase().includes(filters.q.toLowerCase())) return false;
+      if (filters.cat === "__anomal__" && !anomalyIds.has(e.id)) return false;
+      if (filters.cat !== "all" && filters.cat !== "__anomal__" && e.category !== filters.cat) return false;
+      if (filters.q) {
+        const q = filters.q.toLowerCase();
+        const inMerchant = e.merchant.toLowerCase().includes(q);
+        const inDesc = (e.description || "").toLowerCase().includes(q);
+        // Si buscan "#tag" busca en etiquetas
+        const inTag = q.startsWith("#")
+          ? (e.description || "").toLowerCase().includes(q)
+          : false;
+        if (!inMerchant && !inDesc && !inTag) return false;
+      }
       if (filters.from && e.date < filters.from) return false;
       if (filters.to && e.date > filters.to) return false;
+      if (filters.minAmount !== "" && e.amount < Number(filters.minAmount)) return false;
+      if (filters.maxAmount !== "" && e.amount > Number(filters.maxAmount)) return false;
       return true;
     }).sort((a, b) => {
       let r = 0;
@@ -115,12 +134,15 @@ App.views.gastos = async function (container) {
   }
 
   function rowHtml(e) {
+    const isAnomal = anomalyIds.has(e.id);
     return (
-      "<tr data-id=\"" + e.id + "\">" +
+      "<tr data-id=\"" + e.id + "\"" + (isAnomal ? ' style="background:var(--warning-soft,#fffbea)"' : "") + ">" +
         '<td class="nowrap"><span class="mono">' + F.dateShort(e.date) + '</span> <span class="faint" style="font-size:var(--fs-xs)">' + String(F.parse(e.date).getFullYear()).slice(2) + "</span></td>" +
-        "<td><strong>" + esc(e.merchant) + "</strong></td>" +
+        "<td><strong>" + esc(e.merchant) + "</strong>" +
+          (isAnomal ? ' <span title="Gasto inusual" style="color:var(--warning);font-size:12px">' + icon("alert") + "</span>" : "") +
+        "</td>" +
         '<td><span class="badge cat" style="--cat:var(--cat-' + e.category + ')"><span class="dot"></span>' + esc(App.mock.catLabel(e.category)) + "</span></td>" +
-        '<td class="muted">' + esc(e.description || "—") + "</td>" +
+        '<td class="muted">' + formatDescWithTags(e.description) + "</td>" +
         '<td class="num">' + F.money(e.amount) + "</td>" +
         '<td><div class="row-actions">' +
           '<button class="edit" data-id="' + e.id + '" title="Editar">' + icon("edit") + "</button>" +
@@ -128,6 +150,18 @@ App.views.gastos = async function (container) {
         "</div></td>" +
       "</tr>"
     );
+  }
+
+  function formatDescWithTags(desc) {
+    if (!desc) return "—";
+    // Separar texto de etiquetas (#tag)
+    const parts = desc.split(/(#\w+)/g);
+    return parts.map((p) =>
+      p.startsWith("#")
+        ? '<span style="display:inline-block;background:var(--surface-3);border-radius:var(--r-full);' +
+          'padding:1px 8px;font-size:11px;color:var(--text-2);margin:0 2px">' + esc(p) + "</span>"
+        : esc(p)
+    ).join("");
   }
 
   // ---- bindings ----
@@ -139,11 +173,54 @@ App.views.gastos = async function (container) {
   $("#fx-q", container).addEventListener("input", debounce((e) => { filters.q = e.target.value; renderTable(); }, 180));
   $("#fx-from", container).addEventListener("change", (e) => { filters.from = e.target.value; renderTable(); });
   $("#fx-to", container).addEventListener("change", (e) => { filters.to = e.target.value; renderTable(); });
+  $("#fx-min", container).addEventListener("input", debounce((e) => { filters.minAmount = e.target.value; renderTable(); }, 300));
+  $("#fx-max", container).addEventListener("input", debounce((e) => { filters.maxAmount = e.target.value; renderTable(); }, 300));
+
   $("#fx-clear", container).addEventListener("click", () => {
     filters.q = filters.from = filters.to = ""; filters.cat = "all";
+    filters.minAmount = ""; filters.maxAmount = "";
     $("#fx-q").value = ""; $("#fx-from").value = ""; $("#fx-to").value = "";
+    $("#fx-min", container).value = ""; $("#fx-max", container).value = "";
     syncChips(); renderTable();
   });
+
+  $("#fx-export", container).addEventListener("click", exportCSV);
+
+  function exportCSV() {
+    const rows = applyFilters();
+    if (!rows.length) {
+      App.toast.warning('No hay gastos para exportar con los filtros actuales.');
+      return;
+    }
+
+    const headers = ['Fecha', 'Comercio', 'Categoría', 'Monto', 'Descripción'];
+
+    const lines = rows.map((e) => {
+      const cat = App.mock.catLabel ? App.mock.catLabel(e.category) : e.category;
+      return [
+        e.date || '',
+        '"' + (e.merchant  || '').replace(/"/g, '""') + '"',
+        '"' + (cat         || '').replace(/"/g, '""') + '"',
+        e.amount || 0,
+        '"' + (e.description || '').replace(/"/g, '""') + '"',
+      ].join(',');
+    });
+
+    const csv     = [headers.join(','), ...lines].join('\n');
+    const blob    = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url     = URL.createObjectURL(blob);
+    const link    = document.createElement('a');
+    const today   = new Date().toISOString().slice(0, 10);
+
+    link.href     = url;
+    link.download = 'mango-gastos-' + today + '.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    App.toast.success(rows.length + ' gastos exportados correctamente.');
+  }
 
   function bindSort() {
     $$("th.sortable", tableHost).forEach((th) => th.addEventListener("click", () => {

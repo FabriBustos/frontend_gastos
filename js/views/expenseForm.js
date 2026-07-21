@@ -25,6 +25,16 @@ App.expenseForm = (function () {
     values = values || {};
     opts = opts || {};
     const submitLabel = opts.submitLabel || "Guardar gasto";
+
+    const rawDesc = values.description || "";
+    let cleanDesc = rawDesc;
+    let initialTags = "";
+    const tagMatch = rawDesc.match(/(#\w+\s*)+$/);
+    if (tagMatch) {
+      initialTags = tagMatch[0].trim().replace(/#/g, "").replace(/\s+/g, " ");
+      cleanDesc = rawDesc.slice(0, rawDesc.length - tagMatch[0].length).trim();
+    }
+
     return (
       '<form id="expForm" novalidate>' +
         '<div class="form-grid">' +
@@ -39,7 +49,10 @@ App.expenseForm = (function () {
             '<select class="select" id="ef-category"><option value="" disabled' + (values.category ? "" : " selected") + ">Elegí una categoría</option>" +
             categoryOptions(values.category) + "</select>") +
           fieldWrap("description", "Descripción", "span2",
-            '<textarea class="input" id="ef-desc" placeholder="Nota opcional (ej. compra semanal)">' + esc(values.description || "") + "</textarea>", true) +
+            '<textarea class="input" id="ef-desc" placeholder="Nota opcional (ej. compra semanal)">' + esc(cleanDesc) + "</textarea>", true) +
+          fieldWrap("tags", "Etiquetas", "span2",
+            '<input class="input" id="ef-tags" placeholder="Ej: vacaciones trabajo hijos (sin #, separadas por espacios)" value="' + esc(initialTags) + '">' +
+            '<span class="field-hint" style="font-size:var(--fs-xs);color:var(--text-faint)">Usá palabras clave para clasificar mejor tus gastos.</span>', true) +
         "</div>" +
         (opts.inline === false ? "" :
           '<div class="row" style="justify-content:flex-end;gap:var(--sp-3);margin-top:var(--sp-2)">' +
@@ -78,7 +91,12 @@ App.expenseForm = (function () {
         amount: get("ef-amount").value,
         date: get("ef-date").value,
         category: get("ef-category").value,
-        description: get("ef-desc").value,
+        description: (function() {
+          const desc = get("ef-desc").value.trim();
+          const tagsRaw = get("ef-tags") ? get("ef-tags").value.trim() : "";
+          const tags = tagsRaw.split(/\s+/).filter(Boolean).map((t) => "#" + t.replace(/^#+/, "")).join(" ");
+          return tags ? (desc ? desc + " " + tags : tags) : desc;
+        })(),
       };
       const ok = V.form({
         merchant: { el: fields.merchant, value: data.merchant, rules: [V.rules.required, V.rules.min(2)] },

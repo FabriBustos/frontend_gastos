@@ -163,6 +163,12 @@ App.api = (function () {
         const target = params.get("userId");
         return db.recommendations.filter((r) => r.userId === target).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
       }
+      if (method === 'POST' && seg[1] === 'ai-generate') {
+        return {
+          title: 'Reducí gastos en tu categoría principal',
+          text: 'Basándonos en tu historial, tu mayor gasto es en comida. Te recomendamos planificar las compras semanalmente y cocinar más en casa para reducir hasta un 20% ese gasto.',
+        };
+      }
       if (method === "POST") {
         const rec = { id: uid(), userId: body.userId, title: body.title, text: body.text,
           author: session.name, createdAt: new Date().toISOString() };
@@ -197,6 +203,55 @@ App.api = (function () {
         if (!c) throw new ApiError('Consulta no encontrada.', 404);
         Object.assign(c, { answer: body.answer, answeredAt: new Date().toISOString() });
         saveDb(); return c;
+      }
+    }
+
+    /* ---- BUDGETS ---- */
+    if (seg[0] === 'budgets') {
+      if (!db.budgets) { db.budgets = []; saveDb(); }
+      const month = new URLSearchParams(path.split('?')[1] || '').get('month') || new Date().toISOString().slice(0, 7);
+
+      if (method === 'GET') {
+        return db.budgets.filter((b) => b.userId === session.sub && b.month === month);
+      }
+      if (method === 'POST') {
+        const key = session.sub + '_' + body.category + '_' + body.month;
+        const existing = db.budgets.find((b) => b.userId === session.sub && b.category === body.category && b.month === body.month);
+        if (existing) { Object.assign(existing, { amount: body.amount }); saveDb(); return existing; }
+        const b = { id: uid(), userId: session.sub, category: body.category, amount: body.amount, month: body.month, createdAt: new Date().toISOString() };
+        db.budgets.push(b); saveDb(); return b;
+      }
+      if (method === 'DELETE') {
+        const i = db.budgets.findIndex((b) => b.id === seg[1] && b.userId === session.sub);
+        if (i !== -1) { db.budgets.splice(i, 1); saveDb(); }
+        return { deleted: true };
+      }
+    }
+
+    /* ---- GOALS ---- */
+    if (seg[0] === 'goals') {
+      if (!db.goals) { db.goals = []; saveDb(); }
+
+      if (method === 'GET') {
+        return db.goals.filter((g) => g.userId === session.sub);
+      }
+      if (method === 'POST') {
+        const g = { id: uid(), userId: session.sub, title: body.title,
+          targetAmount: body.targetAmount, savedAmount: 0,
+          deadline: body.deadline, completed: false, createdAt: new Date().toISOString() };
+        db.goals.unshift(g); saveDb(); return g;
+      }
+      if (method === 'PATCH' && seg[2] === 'savings') {
+        const g = db.goals.find((x) => x.id === seg[1] && x.userId === session.sub);
+        if (!g) throw new ApiError('Meta no encontrada.', 404);
+        g.savedAmount += body.amount;
+        g.completed = g.savedAmount >= g.targetAmount;
+        saveDb(); return g;
+      }
+      if (method === 'DELETE') {
+        const i = db.goals.findIndex((g) => g.id === seg[1] && g.userId === session.sub);
+        if (i !== -1) { db.goals.splice(i, 1); saveDb(); }
+        return { deleted: true };
       }
     }
 
@@ -264,11 +319,21 @@ App.api = (function () {
     listUsers: () => request("GET", "/users"),
     getRecommendations: (userId) => request("GET", "/recommendations?userId=" + userId),
     addRecommendation: (payload) => request("POST", "/recommendations", payload),
+    generateAiRecommendation: (userId) => request('POST', '/recommendations/ai-generate', { userId }),
     // consultations
     getMyConsultations: () => request('GET', '/consultations/mine'),
     createConsultation: (question) => request('POST', '/consultations', { question }),
     getAllConsultations: () => request('GET', '/consultations'),
     answerConsultation: (id, answer) => request('PATCH', '/consultations/' + id + '/answer', { answer }),
+    // budgets
+    getBudgets:    (month) => request('GET', '/budgets' + (month ? '?month=' + month : '')),
+    upsertBudget:  (data)  => request('POST', '/budgets', data),
+    deleteBudget:  (id)    => request('DELETE', '/budgets/' + id),
+    // saving goals
+    getGoals:    ()           => request('GET',   '/goals'),
+    createGoal:  (data)       => request('POST',  '/goals', data),
+    addSavings:  (id, amount) => request('PATCH', '/goals/' + id + '/savings', { amount }),
+    deleteGoal:  (id)         => request('DELETE', '/goals/' + id),
     // profile
     updateProfile: (payload) => request("PUT", "/me", payload),
   };

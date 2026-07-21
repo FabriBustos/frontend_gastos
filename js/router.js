@@ -25,6 +25,8 @@ App.router = (function () {
     "/perfil":    { view: "perfil",    roles: ["user", "advisor"], chrome: true },
     "/asesor":    { view: "asesor",    roles: ["advisor"], chrome: true },
     "/consultas": { view: "consultas", roles: ["user"], chrome: true },
+    "/presupuestos": { view: "presupuestos", roles: ["user"], chrome: true },
+    "/metas": { view: "metas", roles: ["user"], chrome: true },
   };
 
   function homeFor(role) { return role === "advisor" ? "#/asesor" : "#/dashboard"; }

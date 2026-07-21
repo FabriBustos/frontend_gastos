@@ -23,6 +23,7 @@ App.views.asesor = async function (container, params) {
       "<h1>Panel de clientes</h1>" +
       '<p class="lede">Seleccioná un cliente para analizar sus patrones de consumo y dejarle recomendaciones.</p>' +
     "</div></div>" +
+    '<div id="globalStats" class="mb-6"></div>' +
     '<div class="advisor-grid">' +
       '<div class="card"><div class="card-head"><h3>Clientes</h3><span class="badge" id="clientCount">…</span></div>' +
         '<div class="client-list" id="clientList">' + loaderBlock("Cargando…") + "</div></div>" +
@@ -49,10 +50,102 @@ App.views.asesor = async function (container, params) {
 
   clients.sort((a, b) => b._total - a._total);
   $("#clientCount", container).textContent = clients.length;
+  renderGlobalStats();
   renderClientList();
 
   if (!selectedId) renderPlaceholder();
   else selectClient(selectedId);
+
+  function renderGlobalStats() {
+    const el = $("#globalStats", container);
+    if (!el || !clients.length) return;
+
+    // Combinar todos los gastos de todos los clientes
+    const allExpenses = clients.flatMap((c) => c._expenses || []);
+
+    if (!allExpenses.length) {
+      el.innerHTML = '';
+      return;
+    }
+
+    // Calcular estadísticas globales
+    const totalGlobal = allExpenses.reduce((s, e) => s + e.amount, 0);
+    const avgPerClient = Math.round(totalGlobal / clients.length);
+    const clientsWithExpenses = clients.filter((c) => c._total > 0).length;
+
+    // Categoría más gastada globalmente
+    const byCat = {};
+    allExpenses.forEach((e) => { byCat[e.category] = (byCat[e.category] || 0) + e.amount; });
+    const topCatKey = Object.keys(byCat).sort((a, b) => byCat[b] - byCat[a])[0];
+    const topCatLabel = topCatKey ? App.mock.catLabel(topCatKey) : '—';
+
+    // Clientes con perfil problemático
+    const problematicCount = clients.filter((c) => c._profile && c._profile.problematic).length;
+
+    // Mes con más gasto global
+    const byMonth = {};
+    allExpenses.forEach((e) => {
+      const m = e.date ? e.date.slice(0, 7) : 'unknown';
+      byMonth[m] = (byMonth[m] || 0) + e.amount;
+    });
+    const topMonthKey = Object.keys(byMonth).sort((a, b) => byMonth[b] - byMonth[a])[0];
+    const topMonthLabel = topMonthKey ? F.monthLabel(topMonthKey) : '—';
+
+    el.innerHTML =
+      '<div class="card"><div class="card-head"><h3>' + icon('users') + 'Estadísticas globales</h3>' +
+        '<span class="badge">' + clients.length + ' clientes</span>' +
+      '</div><div class="card-body">' +
+        '<div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:var(--sp-4)">' +
+
+          // Total facturado
+          '<div class="card stat">' +
+            '<div class="stat-top"><span class="stat-label">Total facturado</span>' +
+              '<span class="stat-ico">' + icon('wallet') + '</span></div>' +
+            '<div class="stat-value">' + F.money(totalGlobal) + '</div>' +
+            '<div class="stat-sub">Entre todos los clientes</div>' +
+          '</div>' +
+
+          // Promedio por cliente
+          '<div class="card stat">' +
+            '<div class="stat-top"><span class="stat-label">Promedio por cliente</span>' +
+              '<span class="stat-ico">' + icon('trend') + '</span></div>' +
+            '<div class="stat-value">' + F.money(avgPerClient) + '</div>' +
+            '<div class="stat-sub">' + clientsWithExpenses + ' de ' + clients.length + ' con gastos</div>' +
+          '</div>' +
+
+          // Categoría más gastada
+          '<div class="card stat">' +
+            '<div class="stat-top"><span class="stat-label">Categoría top</span>' +
+              '<span class="stat-ico accent">' + icon('pie') + '</span></div>' +
+            '<div class="stat-value" style="font-size:var(--fs-lg)">' + esc(topCatLabel) + '</div>' +
+            '<div class="stat-sub">' + F.money(byCat[topCatKey] || 0) + ' en total</div>' +
+          '</div>' +
+
+          // Mes pico
+          '<div class="card stat">' +
+            '<div class="stat-top"><span class="stat-label">Mes con más gasto</span>' +
+              '<span class="stat-ico">' + icon('coins') + '</span></div>' +
+            '<div class="stat-value" style="font-size:var(--fs-lg)">' + esc(topMonthLabel) + '</div>' +
+            '<div class="stat-sub">' + F.money(byMonth[topMonthKey] || 0) + '</div>' +
+          '</div>' +
+
+        '</div>' +
+
+        // Alerta de clientes problemáticos
+        (problematicCount > 0
+          ? '<div class="anomaly mt-4" style="background:var(--danger-soft)">' +
+              '<span class="a-ico" style="color:var(--danger)">' + icon('alert') + '</span>' +
+              '<div>' +
+                '<strong>' + problematicCount + ' cliente' + (problematicCount === 1 ? '' : 's') + ' con perfil problemático</strong>' +
+                '<div style="font-size:var(--fs-xs);color:var(--text-2)">Revisá sus gastos para detectar comportamientos de riesgo.</div>' +
+              '</div>' +
+            '</div>'
+          : '<div style="padding:var(--sp-3);background:var(--primary-soft);border-radius:var(--r-md);margin-top:var(--sp-4);font-size:var(--fs-sm);color:var(--primary-strong)">' +
+              icon('check') + ' Ningún cliente presenta comportamiento problemático.' +
+            '</div>') +
+
+      '</div></div>';
+  }
 
   function renderClientList() {
     listEl.innerHTML = clients.map((c) =>
@@ -134,7 +227,10 @@ App.views.asesor = async function (container, params) {
         '<span class="badge">' + recos.length + "</span></div>" +
         '<div class="card-body">' +
           '<form id="recoForm" novalidate>' +
-            '<div class="field"><label>Título</label><input class="input" id="reco-title" placeholder="Ej. Reducir gastos en delivery"></div>' +
+            '<div class="row" style="justify-content:flex-end;margin-bottom:var(--sp-3)">' +
+              '<button class="btn btn-soft btn-sm" id="aiRecoBtn" type="button">' + icon('sparkle') + 'Generar con IA</button>' +
+            '</div>' +
+            '<div class="field"><label>Título</label><input class="input" id="reco-title" placeholder="Ej: Reducí gastos en entretenimiento"></div>' +
             '<div class="field"><label>Recomendación</label><textarea class="input" id="reco-text" placeholder="Escribí una sugerencia concreta para este cliente…"></textarea>' +
               '<span class="error-msg">' + icon("alert") + "<span></span></span></div>" +
             '<div class="row" style="justify-content:flex-end"><button class="btn btn-primary" type="submit" id="reco-send">' + icon("sparkle") + "Enviar recomendación</button></div>" +
@@ -164,7 +260,26 @@ App.views.asesor = async function (container, params) {
         "<p>" + esc(r.text) + "</p></div>").join("");
   }
 
-  function bindRecoForm(clientId) {
+  function bindRecoForm(id) {
+    const aiRecoBtn = $('#aiRecoBtn', detailEl);
+    if (aiRecoBtn) {
+      aiRecoBtn.addEventListener('click', async () => {
+        App.ui.setLoading(aiRecoBtn, true, 'Generando');
+        try {
+          const result = await App.api.generateAiRecommendation(id);
+          const titleInput = $('#reco-title', detailEl);
+          const textInput  = $('#reco-text', detailEl);
+          if (titleInput) titleInput.value = result.title;
+          if (textInput)  textInput.value  = result.text;
+          App.toast.success('Recomendación generada. Revisá y guardá.');
+        } catch (err) {
+          App.toast.error(err.message || 'No se pudo generar la recomendación.', 'Error');
+        } finally {
+          App.ui.setLoading(aiRecoBtn, false);
+        }
+      });
+    }
+
     const form = $("#recoForm", detailEl);
     const fText = form.querySelector('[data-f]') || form.querySelector(".field:nth-child(2)");
     const textField = $("#reco-text", form).closest(".field");
